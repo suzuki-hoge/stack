@@ -1,0 +1,126 @@
+@startuml
+
+package Api {
+  class OptionApi {
+    IO Parameters invoke(Parameters)
+  }
+  package Form {
+    class ApplicationForm {
+      Validation<ValidationError, Application> validate(Parameters)
+    }
+    class UserIdForm {
+      Validation<ValidationError, UserId> validate(Maybe<Value>)
+    }
+    class IntroductionCodeForm {
+      Validation<ValidationError, IntroductionCode> validate(Maybe<Value>)
+    }
+  }
+  class ValidationError<type alias>
+  package Parameters {
+    class Key<type alias>
+    class Value<type alias>
+    class Parameters {
+      [Key, Value]
+      Maybe<Value> !?(Key)
+    }
+  }
+  OptionApi -u-> "1" ApplicationForm
+  ApplicationForm -u-> "1" UserIdForm
+  ApplicationForm -u-> "1" IntroductionCodeForm
+}
+package Service {
+  class UserService {
+    EitherT<BusinessError, IO, Void> checkUser(UserId)
+  }
+  class IntroductionService {
+    EitherT<BusinessError, IO, Void> checkStatus(IntroductionCode)
+  }
+  class OptionService {
+    EitherT<BusinessError, IO, PremiumOptionId> contract(Application)
+  }
+  OptionService -d-> UserService
+  OptionService -d-> IntroductionService
+  class Application {
+    UserId
+    IntroductionCode
+  }
+  OptionService -r-> Application
+}
+package Domain {
+  package User {
+    class User {
+      Either<BusinessError, Contact> checkContractableUser()
+    }
+    class UserId
+    class RegistrationMonth {
+      ElapsedMonth asElapsed(Now)
+    }
+    class ElapsedMonth<not from spec noun>
+    User -r-> UserId
+    User --> RegistrationMonth
+    RegistrationMonth --> ElapsedMonth
+
+    class PremiumOption
+    class PremiumOptionId
+    User --> "0..1" PremiumOption
+    PremiumOption --> "1" PremiumOptionId
+
+    interface Contact
+    class SmsContact
+    class TelephoneNumber
+    class MailContact
+    class MailAddress
+    SmsContact -u-|> Contact
+    SmsContact -d-> "1" TelephoneNumber
+    MailContact -u-|> Contact
+    MailContact -d-> "1" MailAddress
+
+    User --> Contact
+
+    interface UserRepository {
+      IO User findUser(UserId)
+    }
+    UserRepository --> UserId
+    UserRepository --> User
+  }
+  package Introduction {
+    class IntroductionCode
+    enum IntroductionCodeStatus {
+      Unused, Used
+      Either<BusinessError, Void> check()
+    }
+
+    interface IntroductionRepository {
+      IO IntroductionCodeStatus findStatus(IntroductionCode)
+    }
+    IntroductionRepository --> IntroductionCode
+    IntroductionRepository --> IntroductionCodeStatus
+  }
+  package Option {
+    interface OptionRepository {
+      IO PremiumOptionId toPremium(UserId)
+    }
+  }
+  package Notice {
+    class Notice
+    class To
+    class Body
+    Notice -d-> To
+    Notice -d-> Body
+    interface NoticeRepository {
+      IO void noticeTo(Notice)
+    }
+    NoticeRepository -r-> Notice
+  }
+  class BusinessError<type alias>
+}
+
+OptionApi -d-> OptionService
+OptionApi -d-> "0..1 Validation<ValidationError, Application>" Application
+UserService -d-> UserRepository
+IntroductionService -d-> IntroductionRepository
+OptionService -d-> OptionRepository
+OptionService -d-> NoticeRepository
+OptionService -d-> Notice
+
+@enduml
